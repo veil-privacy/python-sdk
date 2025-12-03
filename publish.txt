@@ -1,0 +1,11 @@
+# Install build tools
+pip install build twine
+
+# Build package
+python -m build
+
+# Upload to Test PyPI
+twine upload --repository testpypi dist/*
+
+# Upload to PyPI
+twine upload dist/*
