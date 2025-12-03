@@ -91,7 +91,7 @@ class ZKIntentSDK:
             response.raise_for_status()
             
             result = response.json()
-            print(f"✅ Intent submitted successfully. ID: {result.get('id')}")
+            print(f"✅ Intent submitted successfully. ID: {result.get('intentId')}")
             return result
             
         except requests.exceptions.RequestException as e:

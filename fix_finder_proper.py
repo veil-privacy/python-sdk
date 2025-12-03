@@ -1,0 +1,107 @@
+
+#!/usr/bin/env python3
+import sys
+import os
+
+finder_file = 'venv_test/lib/python3.13/site-packages/__editable___shade_privacy_1_0_0_finder.py'
+
+print(f"Fixing finder file: {finder_file}")
+
+# Read the file
+with open(finder_file, 'r') as f:
+    lines = f.readlines()
+
+# Find where MAPPING is defined
+for i, line in enumerate(lines):
+    if 'MAPPING:' in line and 'dict[str, str]' in line:
+        print(f"Found MAPPING definition at line {i+1}: {line.strip()}")
+        
+        # Check if it's empty
+        if '= {}' in line:
+            # Replace with our mapping
+            lines[i] = 'MAPPING: dict[str, str] = {"shade_privacy": "/home/pete/projects/sdks/shade_privacy"}\n'
+            print("✅ Updated MAPPING with our package")
+            
+            # Write back
+            with open(finder_file, 'w') as f:
+                f.writelines(lines)
+            
+            print("✅ Finder file updated")
+            break
+        else:
+            print(f"❌ MAPPING not empty: {line.strip()}")
+            # Show a few lines around it
+            for j in range(max(0, i-2), min(len(lines), i+3)):
+                print(f"  {j+1}: {lines[j].rstrip()}")
+            break
+else:
+    print("❌ Couldn't find MAPPING definition")
+    print("First 20 lines of file:")
+    for i, line in enumerate(lines[:20]):
+        print(f"  {i+1}: {line.rstrip()}")
+
+# Now test the fixed finder
+print("\n=== Testing fixed finder ===")
+
+# First, remove any existing finder from meta_path
+import importlib.util
+import importlib.machinery
+
+# Clear any existing editable finders
+original_meta_path = sys.meta_path.copy()
+sys.meta_path = [finder for finder in original_meta_path 
+                 if not any(x in str(type(finder)) for x in ['Editable', 'editable'])]
+
+# Execute the fixed .pth file
+pth_file = 'venv_test/lib/python3.13/site-packages/__editable__.shade_privacy-1.0.0.pth'
+with open(pth_file, 'r') as f:
+    pth_code = f.read()
+
+print(f"Executing .pth file: {pth_code.strip()}")
+exec(pth_code)
+
+# Check if finder was added
+print("\nCurrent sys.meta_path:")
+for i, finder in enumerate(sys.meta_path):
+    finder_type = type(finder).__name__
+    if 'Editable' in finder_type:
+        print(f"  ✅ {i}: {finder_type} (editable finder)")
+    else:
+        print(f"  {i}: {finder_type}")
+
+# Try to find the module
+spec = importlib.util.find_spec('shade_privacy')
+print(f"\nModule spec for 'shade_privacy': {spec}")
+
+if spec:
+    print(f"✅ Success! Origin: {spec.origin}")
+    print(f"   Loader: {spec.loader}")
+    
+    # Try to load it
+    try:
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        print(f"✅ Module loaded: {module}")
+        print(f"   Attributes: {[x for x in dir(module) if not x.startswith('_')]}")
+        
+        # Try to get ZKIntentSDK
+        if hasattr(module, 'ZKIntentSDK'):
+            ZKIntentSDK = getattr(module, 'ZKIntentSDK')
+            sdk = ZKIntentSDK('test', 'test')
+            print(f"✅ SDK created: {sdk}")
+    except Exception as e:
+        print(f"❌ Failed to load module: {e}")
+        import traceback
+        traceback.print_exc()
+else:
+    print("❌ Still no module spec found")
+    
+    # Try to import directly as fallback
+    print("\n=== Fallback: Direct import ===")
+    sys.path.insert(0, '/home/pete/projects/sdks/shade_privacy')
+    try:
+        import shade_privacy as direct_module
+        print(f"✅ Direct import works! Module: {direct_module}")
+        print(f"   File: {direct_module.__file__ if hasattr(direct_module, '__file__') else 'built-in'}")
+    except Exception as e:
+        print(f"❌ Direct import failed: {e}")
